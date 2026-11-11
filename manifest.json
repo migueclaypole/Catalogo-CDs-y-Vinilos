@@ -1,0 +1,16 @@
+{
+  "name": "Catálogo de CDs y Vinilos",
+  "short_name": "Mi Discoteca",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f0f2f5",
+  "theme_color": "#1e3a8a",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

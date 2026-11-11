@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <meta name="description" content="Organiza y consulta tu colección de CDs y vinilos.">
+  <title>Catálogo de CDs y Vinilos</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Catálogo de CDs y Vinilos, inicio">
+      <span class="brand-mark" aria-hidden="true">♫</span>
+      <span>Catálogo <span class="brand-light">de CDs y Vinilos</span></span>
+    </a>
+    <div class="top-actions">
+      <button class="button button-outline" id="import-button" type="button"><span aria-hidden="true">↑</span> Importar CSV</button>
+      <input id="import-file" type="file" accept=".csv,text/csv" hidden>
+      <button class="button button-yellow" id="export-button" type="button"><span aria-hidden="true">↓</span> Exportar CSV</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="page-heading">
+      <div>
+        <p class="eyebrow">TU MÚSICA, EN ORDEN</p>
+        <h1>Mi colección</h1>
+        <p class="intro">Un espacio para organizar los álbumes que más te gustan.</p>
+      </div>
+      <div class="collection-count" aria-live="polite">
+        <span class="count-icon" aria-hidden="true">♫</span>
+        <span><strong id="album-count">0</strong><small>álbumes</small></span>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="Secciones del catálogo" role="tablist">
+      <button class="tab active" id="collection-tab" type="button" role="tab" aria-selected="true" aria-controls="collection-panel"><span aria-hidden="true">▦</span> Colección</button>
+      <button class="tab" id="add-tab" type="button" role="tab" aria-selected="false" aria-controls="add-panel"><span aria-hidden="true">＋</span> Agregar Album</button>
+      <button class="tab" id="stats-tab" type="button" role="tab" aria-selected="false" aria-controls="stats-panel"><span aria-hidden="true">▥</span> Estadísticas</button>
+    </nav>
+
+    <section class="panel" id="collection-panel" role="tabpanel" aria-labelledby="collection-tab">
+      <div class="section-heading collection-heading">
+        <div>
+          <h2>Colección</h2>
+          <p>Todos tus álbumes, reunidos en un solo lugar.</p>
+        </div>
+        <label class="search-field">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="collection-search" type="search" placeholder="Buscar artista, álbum o N°" aria-label="Buscar por artista, álbum o número de orden">
+        </label>
+      </div>
+      <p class="form-message collection-message" id="collection-message" role="status" aria-live="polite"></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>N°</th><th>Portada</th><th>Artista</th><th>Álbum</th><th>Año</th><th>Género</th>
+              <th>Subgénero</th><th>Discográfica</th><th>Edición</th><th>Formato</th><th>Repetido</th><th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="collection-body"></tbody>
+        </table>
+        <div class="empty-state" id="empty-state">
+          <span class="empty-icon" aria-hidden="true">♫</span>
+          <h3>Tu colección empieza aquí</h3>
+          <p id="empty-message">Agrega tu primer álbum para verlo en esta lista.</p>
+          <button class="button button-primary" id="empty-add-button" type="button">＋ Agregar álbum</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel form-panel" id="add-panel" role="tabpanel" aria-labelledby="add-tab" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow" id="form-eyebrow">NUEVO REGISTRO</p>
+          <h2 id="form-title">Agregar Album</h2>
+          <p>Completa los detalles del álbum para añadirlo a tu colección.</p>
+        </div>
+        <span class="required-note"><span aria-hidden="true">*</span> Campos obligatorios</span>
+      </div>
+      <form id="album-form">
+        <div class="form-grid">
+          <label class="field">
+            <span>IDInterno</span>
+            <input id="internal-id" name="IDInterno" type="text" readonly>
+            <small>Asignado automáticamente</small>
+          </label>
+          <label class="field">
+            <span>NúmeroOrden</span>
+            <input name="NúmeroOrden" type="text" placeholder="Automático" readonly>
+            <small>Automático según orden de la colección</small>
+          </label>
+          <label class="field">
+            <span>Artista <b aria-hidden="true">*</b></span>
+            <input name="Artista" type="text" autocomplete="off" placeholder="Ej. Charly García" required>
+          </label>
+          <label class="field">
+            <span>Título <b aria-hidden="true">*</b></span>
+            <input name="Título" type="text" autocomplete="off" placeholder="Nombre del álbum" required>
+          </label>
+          <label class="field">
+            <span>Año</span>
+            <input name="Año" type="text" inputmode="numeric" pattern="(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}" placeholder="dd/mm/yyyy" aria-label="Año, formato dd/mm/yyyy">
+            <small>Formato: dd/mm/yyyy</small>
+          </label>
+          <label class="field">
+            <span>Género</span>
+            <select name="Género">
+              <option value="">Seleccionar género</option><option>Blues</option><option>Country</option><option>Disco</option>
+              <option>Electrónica</option><option>Folk</option><option>Folklore</option><option>Jazz</option><option>Metal</option>
+              <option>Pop</option><option>Reggae</option><option>Rock</option><option>Soul</option><option>Tango</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Subgénero</span>
+            <select name="Subgénero">
+              <option value="">Seleccionar subgénero</option><option>Alterlatino</option><option>Alternativo</option>
+              <option>Blues</option><option>Blues Rock</option><option>Country</option><option>Country Blues</option>
+              <option>Disco</option><option>Folk</option><option>Folk Rock</option><option>Folklore</option><option>Funk</option>
+              <option>Funk Rock</option><option>Grunge</option><option>Hard Rock</option><option>Heavy Rock</option><option>Jazz</option>
+              <option>New Wave</option><option>Pop</option><option>Pop Rock</option><option>Progressive</option>
+              <option>Psychedelic</option><option>Punk</option><option>Punk Rock</option><option>R&amp;B</option>
+              <option>Reggae</option><option>Rock</option><option>Soul</option><option>Southern Rock</option>
+              <option>Stoner</option><option>Synth Pop</option><option>Tango</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Discográfica</span>
+            <input name="Discográfica" type="text" placeholder="Nombre del sello discográfico">
+          </label>
+          <label class="field">
+            <span>Edición</span>
+            <input name="Edición" type="text" placeholder="País de edición">
+          </label>
+          <label class="field">
+            <span>Formato</span>
+            <select name="Formato">
+              <option value="">Seleccionar formato</option><option>Box Set</option><option>CD Book</option><option>CD Doble</option>
+              <option>CD Triple</option><option>CD/DVD Combo</option><option>Colección</option><option>Digipack</option>
+              <option>Jewel Case</option><option>Jewel Case Doble</option><option>Slim</option><option>Slipcase</option>
+              <option>Vinilo Single Sleeve</option><option>Vinilo Gatefold</option><option>Vinilo Trifold</option>
+              <option>Vinilo Box Set</option><option>Vinilo 7"</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Repetido</span>
+            <select id="duplicate-select" name="Repetido"><option>No</option><option>Sí</option></select>
+          </label>
+          <label class="field">
+            <span>Motivo</span>
+            <select id="reason-select" name="Motivo" disabled>
+              <option value="">Seleccionar motivo</option><option>Estado</option><option>Gusto</option><option>Intercambio</option>
+              <option>Olvido</option><option>Edición Alternativa</option><option>Edición Especial</option>
+            </select>
+            <small>Disponible si el álbum está repetido</small>
+          </label>
+          <label class="field field-cover">
+            <span>Portada <span class="optional">(URL de imagen)</span></span>
+            <input id="cover-url" name="Portada" type="url" inputmode="url" placeholder="https://ejemplo.com/portada.jpg">
+          </label>
+          <div class="cover-preview" id="cover-preview" hidden>
+            <img id="cover-image" alt="Vista previa de la portada">
+            <span>Vista previa</span>
+          </div>
+        </div>
+        <div class="form-footer">
+          <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
+          <div class="form-actions">
+            <button class="button button-delete" id="delete-edit-button" type="button" hidden>Eliminar</button>
+            <button class="button button-cancel" id="cancel-edit-button" type="button" hidden>Cancelar</button>
+            <button class="button button-primary" id="save-button" type="submit">Guardar álbum <span aria-hidden="true">→</span></button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" id="stats-panel" role="tabpanel" aria-labelledby="stats-tab" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">TU COLECCIÓN EN DATOS</p>
+          <h2>Estadísticas</h2>
+          <p>Explora tus discos por categoría y compara distintas variables.</p>
+        </div>
+      </div>
+      <section class="statistics-section" aria-labelledby="individual-stats-title">
+        <div class="statistics-heading">
+          <div>
+            <h3 id="individual-stats-title">A. Estadísticas Individuales</h3>
+            <p>Distribución parcial o grupal por la variable seleccionada.</p>
+          </div>
+          <label class="stats-control">Analizar por
+            <select id="individual-variable">
+              <option value="Artista">Artista</option><option value="Año">Año</option><option value="Década">Década</option>
+              <option value="Género">Género</option><option value="Subgénero">Subgénero</option><option value="Discográfica">Discográfica</option>
+              <option value="Edición">Edición</option><option value="Formato">Formato</option><option value="Repetido">Repetido</option><option value="Motivo">Motivo</option>
+            </select>
+          </label>
+        </div>
+        <div class="statistics-table-wrap">
+          <table class="statistics-table">
+            <thead><tr><th id="individual-name-heading">Artista</th><th>Cantidad de discos</th><th>Porcentaje</th></tr></thead>
+            <tbody id="individual-stats-body"></tbody>
+            <tfoot><tr><th>Total</th><th id="individual-total-count">0</th><th id="individual-total-percent">0 %</th></tr></tfoot>
+          </table>
+        </div>
+        <p class="statistics-empty" id="individual-stats-empty" hidden>No hay discos para mostrar.</p>
+      </section>
+
+      <section class="statistics-section" aria-labelledby="cross-stats-title">
+        <div class="statistics-heading">
+          <div>
+            <h3 id="cross-stats-title">B. Estadísticas Cruzadas</h3>
+            <p>Compara la cantidad de discos entre dos variables.</p>
+          </div>
+          <div class="stats-controls">
+            <label class="stats-control">Variable 1
+              <select id="cross-variable-one">
+                <option value="Artista">Artista</option><option value="Año">Año</option><option value="Década">Década</option>
+                <option value="Género" selected>Género</option><option value="Subgénero">Subgénero</option><option value="Discográfica">Discográfica</option>
+                <option value="Edición">Edición</option><option value="Formato">Formato</option><option value="Repetido">Repetido</option><option value="Motivo">Motivo</option>
+              </select>
+            </label>
+            <label class="stats-control">Variable 2
+              <select id="cross-variable-two">
+                <option value="Artista">Artista</option><option value="Año">Año</option><option value="Década">Década</option>
+                <option value="Género">Género</option><option value="Subgénero">Subgénero</option><option value="Discográfica">Discográfica</option>
+                <option value="Edición">Edición</option><option value="Formato" selected>Formato</option><option value="Repetido">Repetido</option><option value="Motivo">Motivo</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="statistics-table-wrap">
+          <table class="statistics-table cross-table">
+            <thead id="cross-stats-head"></thead>
+            <tbody id="cross-stats-body"></tbody>
+            <tfoot id="cross-stats-foot"></tfoot>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+  <div class="cover-modal" id="cover-modal" role="dialog" aria-modal="true" aria-label="Portada ampliada" aria-hidden="true" hidden>
+    <button class="cover-modal-close" id="cover-modal-close" type="button" aria-label="Cerrar portada">×</button>
+    <img id="cover-modal-image" alt="">
+  </div>
+  <footer class="footer">Hecho para quienes viven la música <span aria-hidden="true">♫</span></footer>
+</body>
+</html>
