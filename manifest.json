@@ -1,6 +1,6 @@
 {
   "name": "Catálogo de CDs y Vinilos",
-  "short_name": "Mi Discoteca",
+  "short_name": "Mi Catálogo",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f0f2f5",
