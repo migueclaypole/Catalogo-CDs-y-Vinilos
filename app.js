@@ -512,30 +512,65 @@
   document.getElementById("export-button").addEventListener("click", () => {
     const separator = ";";
     const csv = [fields.map(csvEscape).join(separator), ...sortedAlbums(albums).map((album) => fields.map((field) => csvEscape(album[field] || "")).join(separator))].join("\r\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    downloadFile("\uFEFF" + csv, "text/csv;charset=utf-8", "catalogo-cds-vinilos.csv");
+  });
+
+  function downloadFile(content, type, filename) {
+    const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "catalogo-cds-vinilos.csv";
+    link.download = filename;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  document.getElementById("export-json-button").addEventListener("click", () => {
+    const backup = {
+      app: "Catálogo de CDs y Vinilos",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      albums: sortedAlbums(albums)
+    };
+    downloadFile(JSON.stringify(backup, null, 2), "application/json;charset=utf-8", "respaldo-catalogo-cds-vinilos.json");
   });
 
   function detectSeparator(text) {
     let quoted = false;
     let semicolons = 0;
     let commas = 0;
+    let tabs = 0;
     for (let index = 0; index < text.length; index++) {
       const char = text[index];
       if (quoted && char === '"' && text[index + 1] === '"') index++;
       else if (char === '"') quoted = !quoted;
       else if (!quoted && char === ";") semicolons++;
       else if (!quoted && char === ",") commas++;
+      else if (!quoted && char === "\t") tabs++;
       else if (!quoted && (char === "\n" || char === "\r")) break;
     }
-    if (semicolons === 0 && commas === 0) return ";";
-    return semicolons >= commas ? ";" : ",";
+    const separators = [
+      { character: ";", count: semicolons },
+      { character: ",", count: commas },
+      { character: "\t", count: tabs }
+    ];
+    separators.sort((left, right) => right.count - left.count);
+    return separators[0].count > 0 ? separators[0].character : ";";
   }
+
+  function normalizeCsvHeader(header) {
+    return String(header || "")
+      .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, "")
+      .replace(/["']/g, "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("es")
+      .replace(/[^a-z0-9]/g, "");
+  }
+
+  const fieldByHeader = new Map(fields.map((field) => [normalizeCsvHeader(field), field]));
 
   function parseCsv(text, separator) {
     const records = [];
@@ -599,36 +634,71 @@
     const file = event.target.files[0];
     if (!file) return;
     try {
-      let text = (await file.text()).replace(/^\uFEFF/, "");
-      const separatorDirective = text.match(/^sep=([;,])(?:\r\n|\n|\r)/i);
-      let separator;
-      if (separatorDirective) {
-        separator = separatorDirective[1];
-        text = text.slice(separatorDirective[0].length);
+      const text = (await file.text()).replace(/^\uFEFF+/, "");
+      const trimmedText = text.trimStart();
+      const isJson = /\.json$/i.test(file.name) || trimmedText.startsWith("{") || trimmedText.startsWith("[");
+      let importedRecords;
+
+      if (isJson) {
+        const backup = JSON.parse(text);
+        importedRecords = Array.isArray(backup) ? backup : backup && backup.albums;
+        if (!Array.isArray(importedRecords)) {
+          throw new Error("El respaldo JSON debe contener una lista de álbumes.");
+        }
       } else {
-        separator = detectSeparator(text);
+        let csvText = text;
+        const separatorDirective = csvText.match(/^sep=(;|,|\t)(?:\r\n|\n|\r)/i);
+        let separator;
+        if (separatorDirective) {
+          separator = separatorDirective[1];
+          csvText = csvText.slice(separatorDirective[0].length);
+        } else {
+          separator = detectSeparator(csvText);
+        }
+
+        const records = parseCsv(csvText, separator);
+        if (!records.length) throw new Error("El archivo no contiene datos.");
+        const rawHeaders = records.shift();
+        while (rawHeaders.length && !normalizeCsvHeader(rawHeaders[rawHeaders.length - 1])) rawHeaders.pop();
+
+        const headerFields = rawHeaders.map((header) => fieldByHeader.get(normalizeCsvHeader(header)) || "");
+        const requiredFields = fields.filter((field) => field !== "IDInterno" && field !== "NúmeroOrden");
+        const presentFields = new Set(headerFields);
+        const missingFields = requiredFields.filter((field) => !presentFields.has(field));
+        if (missingFields.length) {
+          throw new Error("Faltan columnas requeridas: " + missingFields.join(", ") + ".");
+        }
+        const recognizedHeaders = headerFields.filter(Boolean);
+        if (new Set(recognizedHeaders).size !== recognizedHeaders.length) {
+          throw new Error("El CSV contiene encabezados duplicados.");
+        }
+
+        importedRecords = records.map((record, rowIndex) => {
+          while (record.length > rawHeaders.length && record[record.length - 1] === "") record.pop();
+          if (record.length > rawHeaders.length) {
+            throw new Error("La fila " + (rowIndex + 2) + " tiene más columnas de las indicadas en el encabezado.");
+          }
+          while (record.length < rawHeaders.length) record.push("");
+          const album = {};
+          headerFields.forEach((field, index) => {
+            if (field) album[field] = record[index];
+          });
+          return album;
+        });
       }
-      const records = parseCsv(text, separator);
-      if (!records.length) throw new Error("El archivo no contiene datos.");
-      const headers = records.shift().map((header) => header.replace(/^\uFEFF/, "").trim());
-      while (headers.length && headers[headers.length - 1] === "") headers.pop();
-      const requiredFields = fields.filter((field) => field !== "IDInterno" && field !== "NúmeroOrden");
-      if (requiredFields.some((field) => !headers.includes(field))) throw new Error("El CSV no contiene todas las columnas requeridas.");
-      if (new Set(headers).size !== headers.length) throw new Error("El CSV contiene nombres de columna duplicados.");
+
       const updatedAlbums = albums.slice();
       const importedIds = new Set();
-      const imported = records.map((record, rowIndex) => {
-        while (record.length > headers.length && record[record.length - 1] === "") record.pop();
-        if (record.length > headers.length) {
-          throw new Error("La fila " + (rowIndex + 2) + " tiene más columnas de las indicadas en el encabezado.");
+      importedRecords.forEach((record) => {
+        if (!record || typeof record !== "object" || Array.isArray(record)) {
+          throw new Error("El respaldo contiene un álbum con formato inválido.");
         }
-        while (record.length < headers.length) record.push("");
-        const album = Object.fromEntries(headers.map((header, index) => [header, record[index]]));
+        const album = Object.fromEntries(fields.map((field) => [field, String(record[field] ?? "")]));
         if (album.Repetido !== "Sí") album.Motivo = "";
-        const importedId = String(album.IDInterno || "").trim();
+        const importedId = album.IDInterno.trim();
         if (importedId) {
           const idKey = importedId.toLocaleUpperCase();
-          if (importedIds.has(idKey)) throw new Error("El CSV repite el IDInterno " + importedId + ".");
+          if (importedIds.has(idKey)) throw new Error("El archivo repite el IDInterno " + importedId + ".");
           importedIds.add(idKey);
           album.IDInterno = importedId;
           const existingIndex = updatedAlbums.findIndex((entry) => String(entry.IDInterno || "").toLocaleUpperCase() === idKey);
@@ -638,18 +708,18 @@
           album.IDInterno = nextId(updatedAlbums);
           updatedAlbums.push(album);
         }
-        return album;
       });
+
       const orderedAlbums = reindexAlbums(updatedAlbums);
       persistCollection(orderedAlbums);
       albums = orderedAlbums;
-      collectionMessage.textContent = imported.length + (imported.length === 1 ? " álbum importado." : " álbumes importados.");
+      collectionMessage.textContent = importedRecords.length + (importedRecords.length === 1 ? " álbum importado." : " álbumes importados.");
       if (editingId === null) idInput.value = nextId();
       updateOrderPreview();
       updateCollection();
     } catch (error) {
-      collectionMessage.textContent = "No se pudo importar el CSV: " + error.message;
-      console.error("No se pudo importar el archivo CSV.", error);
+      collectionMessage.textContent = "No se pudo importar el archivo: " + error.message;
+      console.error("No se pudo importar el archivo de respaldo.", error);
     } finally {
       event.target.value = "";
     }
