@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "catalogo-cds-vinilos-v4";
+const CACHE_NAME = "catalogo-cds-vinilos-v6";
 const APP_SHELL = [
   "./",
   "./index.html",

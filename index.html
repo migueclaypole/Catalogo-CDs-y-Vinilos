@@ -54,7 +54,7 @@
         </div>
         <label class="search-field">
           <span class="search-icon" aria-hidden="true">⌕</span>
-          <input id="collection-search" type="search" placeholder="Buscar artista, álbum o N°" aria-label="Buscar por artista, álbum o número de orden">
+          <input id="collection-search" type="search" placeholder="Buscar N°, artista, álbum, año, década, género, subgénero, discográfica, edición, formato, repetido o motivo" aria-label="Buscar en todos los campos de la colección">
         </label>
       </div>
       <p class="form-message collection-message" id="collection-message" role="status" aria-live="polite"></p>
@@ -100,7 +100,10 @@
           </label>
           <label class="field">
             <span>Artista <b aria-hidden="true">*</b></span>
-            <input name="Artista" type="text" autocomplete="off" placeholder="Ej. Charly García" required>
+            <div class="suggestion-control">
+              <input id="artist-input" name="Artista" type="text" autocomplete="off" aria-autocomplete="list" aria-controls="artist-suggestions" aria-expanded="false" placeholder="Ej. Charly García" required>
+              <ul class="suggestion-list" id="artist-suggestions" role="listbox" aria-label="Sugerencias de artista" hidden></ul>
+            </div>
           </label>
           <label class="field">
             <span>Título <b aria-hidden="true">*</b></span>
@@ -134,11 +137,17 @@
           </label>
           <label class="field">
             <span>Discográfica</span>
-            <input name="Discográfica" type="text" placeholder="Nombre del sello discográfico">
+            <div class="suggestion-control">
+              <input id="label-input" name="Discográfica" type="text" autocomplete="off" aria-autocomplete="list" aria-controls="label-suggestions" aria-expanded="false" placeholder="Nombre del sello discográfico">
+              <ul class="suggestion-list" id="label-suggestions" role="listbox" aria-label="Sugerencias de discográfica" hidden></ul>
+            </div>
           </label>
           <label class="field">
             <span>Edición</span>
-            <input name="Edición" type="text" placeholder="País de edición">
+            <div class="suggestion-control">
+              <input id="edition-input" name="Edición" type="text" autocomplete="off" aria-autocomplete="list" aria-controls="edition-suggestions" aria-expanded="false" placeholder="País de edición">
+              <ul class="suggestion-list" id="edition-suggestions" role="listbox" aria-label="Sugerencias de edición" hidden></ul>
+            </div>
           </label>
           <label class="field">
             <span>Formato</span>

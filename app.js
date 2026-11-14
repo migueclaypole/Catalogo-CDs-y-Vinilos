@@ -30,6 +30,11 @@
   const individualVariable = document.getElementById("individual-variable");
   const crossVariableOne = document.getElementById("cross-variable-one");
   const crossVariableTwo = document.getElementById("cross-variable-two");
+  const autocompleteControls = [
+    { field: "Artista", input: document.getElementById("artist-input"), list: document.getElementById("artist-suggestions"), values: [], matches: [], activeIndex: -1 },
+    { field: "Discográfica", input: document.getElementById("label-input"), list: document.getElementById("label-suggestions"), values: [], matches: [], activeIndex: -1 },
+    { field: "Edición", input: document.getElementById("edition-input"), list: document.getElementById("edition-suggestions"), values: [], matches: [], activeIndex: -1 }
+  ];
   let albums = loadAlbums();
   let editingId = null;
   let coverModalTrigger = null;
@@ -186,16 +191,103 @@
     return row;
   }
 
+  function closeSuggestionMenu(control) {
+    control.list.hidden = true;
+    control.activeIndex = -1;
+    control.input.setAttribute("aria-expanded", "false");
+    control.input.removeAttribute("aria-activedescendant");
+  }
+
+  function closeAllSuggestionMenus() {
+    autocompleteControls.forEach(closeSuggestionMenu);
+  }
+
+  function setActiveSuggestion(control, index) {
+    control.activeIndex = (index + control.matches.length) % control.matches.length;
+    Array.from(control.list.children).forEach((option, optionIndex) => {
+      const active = optionIndex === control.activeIndex;
+      option.classList.toggle("is-active", active);
+      option.setAttribute("aria-selected", String(active));
+    });
+    const activeOption = control.list.children[control.activeIndex];
+    control.input.setAttribute("aria-activedescendant", activeOption.id);
+    activeOption.scrollIntoView({ block: "nearest" });
+  }
+
+  function renderSuggestionMenu(control) {
+    const query = control.input.value.trim().toLocaleLowerCase("es");
+    control.matches = control.values.filter((value) => value.toLocaleLowerCase("es").includes(query));
+    control.activeIndex = -1;
+    control.list.replaceChildren();
+
+    control.matches.forEach((value, index) => {
+      const option = document.createElement("li");
+      option.id = control.list.id + "-option-" + index;
+      option.className = "suggestion-option";
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", "false");
+      option.textContent = value;
+      control.list.appendChild(option);
+    });
+
+    control.list.hidden = control.matches.length === 0;
+    control.input.setAttribute("aria-expanded", String(!control.list.hidden));
+    control.input.removeAttribute("aria-activedescendant");
+  }
+
+  function chooseSuggestion(control, value) {
+    control.input.value = value;
+    control.input.dispatchEvent(new Event("input", { bubbles: true }));
+    closeSuggestionMenu(control);
+  }
+
+  function refreshAutocompleteSuggestions() {
+    autocompleteControls.forEach((control) => {
+      const suggestions = new Map();
+      albums.forEach((album) => {
+        const value = String(album[control.field] || "").trim();
+        if (value && !suggestions.has(value.toLocaleLowerCase("es"))) {
+          suggestions.set(value.toLocaleLowerCase("es"), value);
+        }
+      });
+
+      control.values = Array.from(suggestions.values())
+        .sort((left, right) => left.localeCompare(right, "es", { sensitivity: "base" }));
+      if (!control.list.hidden) renderSuggestionMenu(control);
+    });
+  }
+
+  function searchableDecade(album) {
+    const match = String(album.Año || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match || parseDate(album.Año) === null) return "";
+    const decade = Math.floor(Number(match[3]) / 10) * 10;
+    return decade + "-" + (decade + 9);
+  }
+
   function updateCollection() {
     rows.replaceChildren();
     const query = searchInput.value.trim().toLocaleLowerCase("es");
     const visibleAlbums = sortedAlbums(albums).filter((album) => {
       if (!query) return true;
-      return [album.Artista, album.Título, album["NúmeroOrden"]]
+      const searchableValues = [
+        album["NúmeroOrden"],
+        album.Artista,
+        album.Título,
+        album.Año,
+        searchableDecade(album),
+        album.Género,
+        album.Subgénero,
+        album.Discográfica,
+        album.Edición,
+        album.Formato,
+        String(album.Repetido || "No") + (album.Motivo ? " - " + album.Motivo : "")
+      ];
+      return searchableValues
         .some((value) => String(value || "").toLocaleLowerCase("es").includes(query));
     });
     visibleAlbums.forEach((album) => rows.appendChild(renderRow(album)));
 
+    refreshAutocompleteSuggestions();
     const count = albums.length;
     document.getElementById("album-count").textContent = count;
     emptyState.hidden = visibleAlbums.length > 0;
@@ -347,6 +439,7 @@
   }
 
   function resetForm() {
+    closeAllSuggestionMenus();
     form.reset();
     editingId = null;
     reasonSelect.disabled = true;
@@ -364,6 +457,7 @@
   function beginEdit(id) {
     const album = albums.find((entry) => String(entry.IDInterno) === id);
     if (!album) return;
+    closeAllSuggestionMenus();
     showTab("add-tab");
     editingId = id;
     fields.forEach((field) => {
@@ -392,6 +486,41 @@
   crossVariableTwo.addEventListener("change", renderCrossStatistics);
 
   duplicateSelect.addEventListener("change", syncReasonField);
+  autocompleteControls.forEach((control) => {
+    control.input.addEventListener("focus", () => renderSuggestionMenu(control));
+    control.input.addEventListener("click", () => renderSuggestionMenu(control));
+    control.input.addEventListener("input", () => renderSuggestionMenu(control));
+    control.input.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        if (control.list.hidden) renderSuggestionMenu(control);
+        if (control.matches.length) {
+          event.preventDefault();
+          const direction = event.key === "ArrowDown" ? 1 : -1;
+          const nextIndex = control.activeIndex === -1
+            ? (direction === 1 ? 0 : control.matches.length - 1)
+            : control.activeIndex + direction;
+          setActiveSuggestion(control, nextIndex);
+        }
+      } else if (event.key === "Enter" && control.activeIndex !== -1) {
+        event.preventDefault();
+        chooseSuggestion(control, control.matches[control.activeIndex]);
+      } else if (event.key === "Escape") {
+        closeSuggestionMenu(control);
+      } else if (event.key === "Tab") {
+        closeSuggestionMenu(control);
+      }
+    });
+    control.list.addEventListener("click", (event) => {
+      const option = event.target.closest('[role="option"]');
+      if (!option || !control.list.contains(option)) return;
+      chooseSuggestion(control, option.textContent);
+    });
+  });
+  document.addEventListener("click", (event) => {
+    autocompleteControls.forEach((control) => {
+      if (!control.input.parentElement.contains(event.target)) closeSuggestionMenu(control);
+    });
+  });
   form.elements["Artista"].addEventListener("input", updateOrderPreview);
   form.elements["Año"].addEventListener("input", updateOrderPreview);
   form.elements["Artista"].addEventListener("blur", (event) => {
